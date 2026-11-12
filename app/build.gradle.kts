@@ -12,19 +12,31 @@ android {
         applicationId = "pl.skaner.pdf"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
 
         // Tylko 64-bitowe ARM (Redmi Note 9S/10S/11S/12S i praktycznie wszystkie nowe telefony)
         ndk { abiFilters += "arm64-v8a" }
     }
 
+    // Stały klucz podpisu – dzięki temu kolejne wersje instalują się na poprzednich.
+    // Klucz jest w publicznym repo, więc nadaje się do użytku prywatnego, nie do Google Play.
+    signingConfigs {
+        create("skaner") {
+            storeFile = file("skaner.keystore")
+            storePassword = "skanerpdf"
+            keyAlias = "skaner"
+            keyPassword = "skanerpdf"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Podpisywanie debug-kluczem, żeby release dało się od razu zainstalować.
-            // Do publikacji w Google Play podmień na własny klucz.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("skaner")
+        }
+        debug {
+            signingConfig = signingConfigs.getByName("skaner")
         }
     }
 

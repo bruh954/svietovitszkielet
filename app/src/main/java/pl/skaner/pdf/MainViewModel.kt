@@ -20,7 +20,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     val photos = mutableStateListOf<PhotoItem>()
 
-    var options by mutableStateOf(PdfOptions())
+    private val prefs = app.getSharedPreferences("ustawienia", 0)
+
+    var options by mutableStateOf(PdfOptions(
+        engine = runCatching { OcrEngine.valueOf(prefs.getString("engine", null) ?: "") }
+            .getOrDefault(OcrEngine.PRINT)
+    ))
+    var apiKey by mutableStateOf(prefs.getString("visionKey", "") ?: "")
+        private set
+
+    fun updateApiKey(k: String) { apiKey = k; prefs.edit().putString("visionKey", k.trim()).apply() }
+    fun updateEngine(e: OcrEngine) { options = options.copy(engine = e); prefs.edit().putString("engine", e.name).apply() }
     var fileName by mutableStateOf(defaultName())
     var busy by mutableStateOf(false); private set
     var progress by mutableStateOf(0 to 0); private set
@@ -50,7 +60,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val out = File(getApplication<Application>().cacheDir, "pdf/$name.pdf")
         viewModelScope.launch {
             try {
-                result = builder.build(photos.toList(), options.copy(title = name), out) { p, t ->
+                result = builder.build(photos.toList(), options.copy(title = name, apiKey = apiKey), out) { p, t ->
                     progress = p to t
                 }
             } catch (t: Throwable) {

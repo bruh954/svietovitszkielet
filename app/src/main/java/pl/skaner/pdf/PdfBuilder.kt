@@ -31,6 +31,11 @@ data class PhotoItem(val uri: Uri, val rotation: Int = 0)
 
 enum class PageSize { A4, FIT_PHOTO }
 
+enum class OcrEngine(val label: String) {
+    PRINT("Druk (offline)"),
+    HANDWRITING("Pismo odręczne")
+}
+
 enum class Quality(val label: String, val maxSide: Int, val jpeg: Float) {
     ECONOMY("Mały plik", 1600, 0.65f),
     STANDARD("Standard", 2400, 0.8f),
@@ -39,6 +44,8 @@ enum class Quality(val label: String, val maxSide: Int, val jpeg: Float) {
 
 data class PdfOptions(
     val ocr: Boolean = true,
+    val engine: OcrEngine = OcrEngine.PRINT,
+    val apiKey: String = "",
     val pageSize: PageSize = PageSize.A4,
     val quality: Quality = Quality.STANDARD,
     val title: String = "Skan"
@@ -63,7 +70,11 @@ class PdfBuilder(private val context: Context) {
         output: File,
         onProgress: (page: Int, total: Int) -> Unit
     ): PdfResult = withContext(Dispatchers.Default) {
-        val recognizer = if (options.ocr)
+        val handwriting = options.ocr && options.engine == OcrEngine.HANDWRITING
+        if (handwriting) require(options.apiKey.isNotBlank()) {
+            "Wpisz klucz API Google Cloud Vision, żeby rozpoznawać pismo odręczne."
+        }
+        val recognizer = if (options.ocr && !handwriting)
             TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) else null
         var words = 0
 
@@ -96,7 +107,13 @@ class PdfBuilder(private val context: Context) {
                 val oy = (pageRect.height - dh) / 2f
 
                 // --- OCR ---
-                val text = recognizer?.process(InputImage.fromBitmap(bmp, 0))?.await()
+                val lines: List<OcrLine> = when {
+                    handwriting -> withContext(Dispatchers.IO) { CloudVisionOcr.recognize(bmp, options.apiKey) }
+                    recognizer != null -> recognizer.process(InputImage.fromBitmap(bmp, 0)).await()
+                        .textBlocks.flatMap { b -> b.lines }
+                        .mapNotNull { l -> l.boundingBox?.let { OcrLine(l.text, it, l.elements.size) } }
+                    else -> emptyList()
+                }
 
                 val page = PDPage(pageRect)
                 doc.addPage(page)
@@ -106,12 +123,12 @@ class PdfBuilder(private val context: Context) {
                 PDPageContentStream(doc, page).use { cs ->
                     cs.drawImage(image, ox, oy, dw, dh)
 
-                    if (text != null && font != null) {
-                        for (block in text.textBlocks) for (line in block.lines) {
-                            val box = line.boundingBox ?: continue
+                    if (font != null) {
+                        for (line in lines) {
+                            val box = line.box
                             val str = sanitize(line.text, font).trim()
                             if (str.isEmpty()) continue
-                            words += line.elements.size
+                            words += line.words
 
                             val bw = box.width() * s
                             val bh = box.height() * s

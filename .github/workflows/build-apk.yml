@@ -39,8 +39,8 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.${{ github.run_number }}
-          name: Skaner PDF 1.0.${{ github.run_number }}
-          body: "Pobierz plik SkanerPDF.apk i zainstaluj na telefonie (Android 7.0+)."
+          tag_name: v1.1.${{ github.run_number }}
+          name: Skaner PDF 1.1.${{ github.run_number }}
+          body: "Pobierz plik SkanerPDF.apk i zainstaluj na telefonie (Android 7.0+, 64-bit ARM). Nowość: rozpoznawanie pisma odręcznego (Google Cloud Vision)."
           files: out/SkanerPDF.apk
           make_latest: true

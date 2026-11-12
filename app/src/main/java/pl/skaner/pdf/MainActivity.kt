@@ -126,7 +126,8 @@ fun MainScreen(vm: MainViewModel) {
                     Spacer(Modifier.height(8.dp))
                     Button(
                         onClick = { vm.generate() },
-                        enabled = vm.photos.isNotEmpty() && !vm.busy,
+                        enabled = vm.photos.isNotEmpty() && !vm.busy &&
+                            !(vm.options.ocr && vm.options.engine == OcrEngine.HANDWRITING && vm.apiKey.isBlank()),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(Icons.Default.PictureAsPdf, null); Spacer(Modifier.width(6.dp))
@@ -202,6 +203,20 @@ private fun OptionsCard(vm: MainViewModel) {
                 Switch(checked = vm.options.ocr, enabled = !vm.busy,
                     onCheckedChange = { vm.options = vm.options.copy(ocr = it) })
             }
+            if (vm.options.ocr) {
+                Text("Rodzaj tekstu", style = MaterialTheme.typography.labelLarge)
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    val engines = OcrEngine.entries
+                    engines.forEachIndexed { i, e ->
+                        SegmentedButton(
+                            selected = vm.options.engine == e, enabled = !vm.busy,
+                            onClick = { vm.updateEngine(e) },
+                            shape = SegmentedButtonDefaults.itemShape(i, engines.size)
+                        ) { Text(e.label) }
+                    }
+                }
+                if (vm.options.engine == OcrEngine.HANDWRITING) HandwritingKeyField(vm)
+            }
             Text("Rozmiar strony", style = MaterialTheme.typography.labelLarge)
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                 val sizes = listOf(PageSize.A4 to "A4", PageSize.FIT_PHOTO to "Jak zdjęcie")
@@ -226,6 +241,36 @@ private fun OptionsCard(vm: MainViewModel) {
             }
         }
     }
+}
+
+@Composable
+private fun HandwritingKeyField(vm: MainViewModel) {
+    val ctx = LocalContext.current
+    var visible by remember { mutableStateOf(false) }
+    Text(
+        "Pismo odręczne rozpoznaje Google Cloud Vision – zdjęcia są wysyłane przez internet. " +
+            "Potrzebny jest Twój klucz API (1000 stron miesięcznie bezpłatnie).",
+        style = MaterialTheme.typography.bodySmall
+    )
+    OutlinedTextField(
+        value = vm.apiKey, onValueChange = { vm.updateApiKey(it) },
+        label = { Text("Klucz API Google Cloud Vision") }, singleLine = true,
+        enabled = !vm.busy, modifier = Modifier.fillMaxWidth(),
+        visualTransformation = if (visible) androidx.compose.ui.text.input.VisualTransformation.None
+            else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+        trailingIcon = {
+            IconButton(onClick = { visible = !visible }) {
+                Icon(if (visible) Icons.Default.VisibilityOff else Icons.Default.Visibility, "Pokaż klucz")
+            }
+        },
+        isError = vm.apiKey.isBlank()
+    )
+    TextButton(onClick = {
+        try {
+            ctx.startActivity(Intent(Intent.ACTION_VIEW,
+                Uri.parse("https://console.cloud.google.com/apis/library/vision.googleapis.com")))
+        } catch (_: ActivityNotFoundException) {}
+    }) { Text("Jak zdobyć klucz? Otwórz Google Cloud Console") }
 }
 
 @Composable
