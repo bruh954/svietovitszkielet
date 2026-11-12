@@ -4,6 +4,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -31,3 +34,13 @@ jobs:
         with:
           name: SkanerPDF-apk
           path: out/SkanerPDF.apk
+
+      - name: Publish release with APK
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Skaner PDF 1.0.${{ github.run_number }}
+          body: "Pobierz plik SkanerPDF.apk i zainstaluj na telefonie (Android 7.0+)."
+          files: out/SkanerPDF.apk
+          make_latest: true
