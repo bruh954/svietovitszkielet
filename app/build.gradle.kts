@@ -14,6 +14,9 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+
+        // Tylko 64-bitowe ARM (Redmi Note 9S/10S/11S/12S i praktycznie wszystkie nowe telefony)
+        ndk { abiFilters += "arm64-v8a" }
     }
 
     buildTypes {
