@@ -73,9 +73,24 @@ fun MainScreen(vm: MainViewModel) {
     val ctx = LocalContext.current
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
 
+    var addMenu by remember { mutableStateOf(false) }
+
+    // Systemowy wybór zdjęć – limit ustala Android (zwykle 100 naraz), ale można dodawać wielokrotnie
     val pickPhotos = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickMultipleVisualMedia(100)
+        ActivityResultContracts.PickMultipleVisualMedia()
     ) { uris -> if (uris.isNotEmpty()) vm.add(uris) }
+
+    // Menedżer plików – bez limitu liczby zdjęć
+    val pickFiles = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris -> if (uris.isNotEmpty()) vm.add(uris) }
+
+    // Cały folder – wszystkie zdjęcia, posortowane po nazwie pliku
+    val pickFolder = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { tree -> if (tree != null) vm.addFolder(tree) { n ->
+        Toast.makeText(ctx, if (n > 0) "Dodano zdjęć: $n" else "W tym folderze nie ma zdjęć", Toast.LENGTH_SHORT).show()
+    } }
 
     val takePhoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         val u = pendingCameraUri
@@ -114,10 +129,29 @@ fun MainScreen(vm: MainViewModel) {
             Surface(tonalElevation = 3.dp) {
                 Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(12.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(
-                            onClick = { pickPhotos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                            enabled = !vm.busy, modifier = Modifier.weight(1f)
-                        ) { Icon(Icons.Default.PhotoLibrary, null); Spacer(Modifier.width(6.dp)); Text("Galeria") }
+                        Box(Modifier.weight(1f)) {
+                            OutlinedButton(
+                                onClick = { addMenu = true },
+                                enabled = !vm.busy, modifier = Modifier.fillMaxWidth()
+                            ) { Icon(Icons.Default.AddPhotoAlternate, null); Spacer(Modifier.width(6.dp)); Text("Dodaj zdjęcia") }
+                            DropdownMenu(expanded = addMenu, onDismissRequest = { addMenu = false }) {
+                                DropdownMenuItem(
+                                    text = { Text("Galeria (do 100 naraz)") },
+                                    leadingIcon = { Icon(Icons.Default.PhotoLibrary, null) },
+                                    onClick = {
+                                        addMenu = false
+                                        pickPhotos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                    })
+                                DropdownMenuItem(
+                                    text = { Text("Pliki – bez limitu") },
+                                    leadingIcon = { Icon(Icons.Default.Folder, null) },
+                                    onClick = { addMenu = false; pickFiles.launch(arrayOf("image/*")) })
+                                DropdownMenuItem(
+                                    text = { Text("Cały folder") },
+                                    leadingIcon = { Icon(Icons.Default.FolderOpen, null) },
+                                    onClick = { addMenu = false; pickFolder.launch(null) })
+                            }
+                        }
                         OutlinedButton(
                             onClick = { launchCamera() },
                             enabled = !vm.busy, modifier = Modifier.weight(1f)

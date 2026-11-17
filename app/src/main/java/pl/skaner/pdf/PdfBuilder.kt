@@ -10,6 +10,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
+import com.tom_roush.pdfbox.io.MemoryUsageSetting
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
@@ -78,7 +79,9 @@ class PdfBuilder(private val context: Context) {
             TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) else null
         var words = 0
 
-        PDDocument().use { doc ->
+        // Obrazy trzymane w pliku tymczasowym, nie w pamięci – można składać setki stron
+        val tmp = File(context.cacheDir, "pdftmp").apply { mkdirs() }
+        PDDocument(MemoryUsageSetting.setupTempFileOnly().setTempDir(tmp)).use { doc ->
             doc.documentInformation.title = options.title
             doc.documentInformation.creator = "Skaner PDF"
             val font = if (options.ocr) loadUnicodeFont(doc) else null

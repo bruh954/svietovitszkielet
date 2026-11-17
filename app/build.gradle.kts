@@ -12,8 +12,8 @@ android {
         applicationId = "pl.skaner.pdf"
         minSdk = 24
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 3
+        versionName = "1.2"
 
         // Tylko 64-bitowe ARM (Redmi Note 9S/10S/11S/12S i praktycznie wszystkie nowe telefony)
         ndk { abiFilters += "arm64-v8a" }

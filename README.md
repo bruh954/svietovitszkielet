@@ -5,7 +5,8 @@ jako **niewidoczną warstwę**, ułożoną dokładnie nad napisami. Dzięki temu
 wyszukiwanie (Ctrl+F), zaznaczanie i kopiowanie tekstu, a strony wyglądają jak oryginalne zdjęcia.
 
 ## Funkcje
-- zdjęcia z galerii (wiele naraz), z aparatu albo przez „Udostępnij → Skaner PDF” z innej aplikacji
+- zdjęcia z galerii (do 100 naraz, można dodawać wielokrotnie), z menedżera plików lub całego folderu (**bez limitu**), z aparatu albo przez „Udostępnij → Skaner PDF”
+- setki stron w jednym PDF – obrazy są buforowane na dysku, a nie w pamięci
 - zmiana kolejności stron, obracanie o 90°, usuwanie
 - OCR druku na telefonie (Google ML Kit), **bez internetu**, z polskimi znakami
 - tryb **pisma odręcznego** (Google Cloud Vision, przez internet, wymaga klucza API)
