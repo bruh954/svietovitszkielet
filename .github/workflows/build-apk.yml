@@ -39,8 +39,8 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.2.${{ github.run_number }}
-          name: Skaner PDF 1.2.${{ github.run_number }}
-          body: "Pobierz plik SkanerPDF.apk i zainstaluj na telefonie (Android 7.0+, 64-bit ARM). Nowość: dowolna liczba zdjęć (Dodaj zdjęcia → Pliki albo Cały folder)."
+          tag_name: v1.3.${{ github.run_number }}
+          name: Skaner PDF 1.3.${{ github.run_number }}
+          body: "Pobierz plik SkanerPDF.apk i zainstaluj na telefonie (Android 7.0+, 64-bit ARM). Działa w pełni offline – bez dostępu do internetu."
           files: out/SkanerPDF.apk
           make_latest: true

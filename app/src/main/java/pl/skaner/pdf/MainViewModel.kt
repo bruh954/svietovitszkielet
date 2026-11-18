@@ -24,15 +24,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val prefs = app.getSharedPreferences("ustawienia", 0)
 
-    var options by mutableStateOf(PdfOptions(
-        engine = runCatching { OcrEngine.valueOf(prefs.getString("engine", null) ?: "") }
-            .getOrDefault(OcrEngine.PRINT)
-    ))
-    var apiKey by mutableStateOf(prefs.getString("visionKey", "") ?: "")
-        private set
+    var options by mutableStateOf(PdfOptions())
 
-    fun updateApiKey(k: String) { apiKey = k; prefs.edit().putString("visionKey", k.trim()).apply() }
-    fun updateEngine(e: OcrEngine) { options = options.copy(engine = e); prefs.edit().putString("engine", e.name).apply() }
+    init {
+        // Usuń klucz Google zapisany przez wersję 1.1–1.2
+        prefs.edit().remove("visionKey").remove("engine").apply()
+    }
     var fileName by mutableStateOf(defaultName())
     var busy by mutableStateOf(false); private set
     var progress by mutableStateOf(0 to 0); private set
@@ -94,7 +91,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val out = File(getApplication<Application>().cacheDir, "pdf/$name.pdf")
         viewModelScope.launch {
             try {
-                result = builder.build(photos.toList(), options.copy(title = name, apiKey = apiKey), out) { p, t ->
+                result = builder.build(photos.toList(), options.copy(title = name), out) { p, t ->
                     progress = p to t
                 }
             } catch (t: Throwable) {

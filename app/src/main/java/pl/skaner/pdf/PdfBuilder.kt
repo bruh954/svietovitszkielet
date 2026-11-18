@@ -32,10 +32,8 @@ data class PhotoItem(val uri: Uri, val rotation: Int = 0)
 
 enum class PageSize { A4, FIT_PHOTO }
 
-enum class OcrEngine(val label: String) {
-    PRINT("Druk (offline)"),
-    HANDWRITING("Pismo odręczne")
-}
+/** Jedna linia rozpoznanego tekstu i jej położenie na zdjęciu (w pikselach). */
+data class OcrLine(val text: String, val box: android.graphics.Rect, val words: Int)
 
 enum class Quality(val label: String, val maxSide: Int, val jpeg: Float) {
     ECONOMY("Mały plik", 1600, 0.65f),
@@ -45,8 +43,6 @@ enum class Quality(val label: String, val maxSide: Int, val jpeg: Float) {
 
 data class PdfOptions(
     val ocr: Boolean = true,
-    val engine: OcrEngine = OcrEngine.PRINT,
-    val apiKey: String = "",
     val pageSize: PageSize = PageSize.A4,
     val quality: Quality = Quality.STANDARD,
     val title: String = "Skan"
@@ -71,11 +67,8 @@ class PdfBuilder(private val context: Context) {
         output: File,
         onProgress: (page: Int, total: Int) -> Unit
     ): PdfResult = withContext(Dispatchers.Default) {
-        val handwriting = options.ocr && options.engine == OcrEngine.HANDWRITING
-        if (handwriting) require(options.apiKey.isNotBlank()) {
-            "Wpisz klucz API Google Cloud Vision, żeby rozpoznawać pismo odręczne."
-        }
-        val recognizer = if (options.ocr && !handwriting)
+        // OCR wyłącznie na telefonie – zdjęcia nigdzie nie są wysyłane
+        val recognizer = if (options.ocr)
             TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) else null
         var words = 0
 
@@ -110,13 +103,10 @@ class PdfBuilder(private val context: Context) {
                 val oy = (pageRect.height - dh) / 2f
 
                 // --- OCR ---
-                val lines: List<OcrLine> = when {
-                    handwriting -> withContext(Dispatchers.IO) { CloudVisionOcr.recognize(bmp, options.apiKey) }
-                    recognizer != null -> recognizer.process(InputImage.fromBitmap(bmp, 0)).await()
-                        .textBlocks.flatMap { b -> b.lines }
-                        .mapNotNull { l -> l.boundingBox?.let { OcrLine(l.text, it, l.elements.size) } }
-                    else -> emptyList()
-                }
+                val lines: List<OcrLine> = recognizer?.process(InputImage.fromBitmap(bmp, 0))?.await()
+                    ?.textBlocks?.flatMap { b -> b.lines }
+                    ?.mapNotNull { l -> l.boundingBox?.let { OcrLine(l.text, it, l.elements.size) } }
+                    ?: emptyList()
 
                 val page = PDPage(pageRect)
                 doc.addPage(page)
