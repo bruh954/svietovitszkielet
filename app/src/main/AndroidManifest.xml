@@ -8,11 +8,20 @@
          biblioteki Google (ML Kit wysyła w tle statystyki użycia) – nic nie opuszcza telefonu. -->
     <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
 
+    <!-- Własna galeria z numerami stron (tylko odczyt zdjęć) -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!-- Android 10 i starsze: zapis PDF w Pobranych i usuwanie zdjęć -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"
+        tools:ignore="ScopedStorage" />
+
     <application
         android:allowBackup="true"
         android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
         android:largeHeap="true"
+        android:requestLegacyExternalStorage="true"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 

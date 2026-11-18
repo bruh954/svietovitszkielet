@@ -5,14 +5,16 @@ jako **niewidoczną warstwę**, ułożoną dokładnie nad napisami. Dzięki temu
 wyszukiwanie (Ctrl+F), zaznaczanie i kopiowanie tekstu, a strony wyglądają jak oryginalne zdjęcia.
 
 ## Funkcje
-- zdjęcia z galerii (do 100 naraz, można dodawać wielokrotnie), z menedżera plików lub całego folderu (**bez limitu**), z aparatu albo przez „Udostępnij → Skaner PDF”
+- własna galeria z **numerem strony przy każdym zaznaczonym zdjęciu**, albumami i „Zaznacz wszystkie”, bez limitu liczby zdjęć
+- zdjęcia także z menedżera plików, całego folderu, aparatu albo przez „Udostępnij → Skaner PDF”
+- opcja **„Usuń zdjęcia po utworzeniu PDF”**: PDF jest najpierw zapisywany w Pobrane/SkanerPDF, a dopiero potem zdjęcia są usuwane (Android pyta o zgodę)
 - setki stron w jednym PDF – obrazy są buforowane na dysku, a nie w pamięci
 - zmiana kolejności stron, obracanie o 90°, usuwanie
 - OCR na telefonie (Google ML Kit), **bez internetu**, z polskimi znakami – najlepiej czyta druk, pismo odręczne tylko wyraźne
 - rozmiar strony: A4 (pion lub poziom, dobierany automatycznie) albo „jak zdjęcie”
 - trzy poziomy jakości (rozmiar pliku a ostrość)
 - gotowy PDF: Otwórz / Udostępnij / Zapisz… (dowolny folder, np. Pobrane albo Dysk Google)
-- **bez dostępu do internetu** – zdjęcia nigdy nie opuszczają telefonu; nie potrzebuje żadnych uprawnień
+- **bez dostępu do internetu** – zdjęcia nigdy nie opuszczają telefonu; jedyne uprawnienie to odczyt zdjęć (dla galerii)
 
 ## Jak zbudować
 1. Zainstaluj **Android Studio** (wersja Ladybug 2024.2 albo nowsza).

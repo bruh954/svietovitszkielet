@@ -45,6 +45,7 @@ data class PdfOptions(
     val ocr: Boolean = true,
     val pageSize: PageSize = PageSize.A4,
     val quality: Quality = Quality.STANDARD,
+    val deleteAfter: Boolean = false,
     val title: String = "Skan"
 )
 

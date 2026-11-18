@@ -1,6 +1,9 @@
 package pl.skaner.pdf
 
+import android.Manifest
+import android.app.Activity
 import android.content.ActivityNotFoundException
+import androidx.activity.result.IntentSenderRequest
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -74,11 +77,44 @@ fun MainScreen(vm: MainViewModel) {
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
 
     var addMenu by remember { mutableStateOf(false) }
+    var showGallery by remember { mutableStateOf(false) }
 
     // Systemowy wybór zdjęć – limit ustala Android (zwykle 100 naraz), ale można dodawać wielokrotnie
     val pickPhotos = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia()
     ) { uris -> if (uris.isNotEmpty()) vm.add(uris) }
+
+    // Własna galeria (numery stron, bez limitu) – wymaga zgody na odczyt zdjęć
+    val galleryPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { granted ->
+        if (granted.values.any { it }) showGallery = true
+        else {
+            Toast.makeText(ctx, "Bez zgody na zdjęcia otwieram systemowy wybór (do 100 naraz)", Toast.LENGTH_LONG).show()
+            pickPhotos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        }
+    }
+    fun openGallery() {
+        val perms = when {
+            Build.VERSION.SDK_INT >= 34 -> arrayOf(Manifest.permission.READ_MEDIA_IMAGES,
+                "android.permission.READ_MEDIA_VISUAL_USER_SELECTED")
+            Build.VERSION.SDK_INT >= 33 -> arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
+            Build.VERSION.SDK_INT >= 30 -> arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+            else -> arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        }
+        galleryPermission.launch(perms)
+    }
+
+    // Systemowe okno „Zezwolić na usunięcie zdjęć?”
+    val deleteRequest = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()
+    ) { r -> vm.onDeleteResult(r.resultCode == Activity.RESULT_OK) }
+    LaunchedEffect(vm.pendingDelete) {
+        vm.pendingDelete?.let {
+            vm.deleteDialogShown()
+            deleteRequest.launch(IntentSenderRequest.Builder(it).build())
+        }
+    }
 
     // Menedżer plików – bez limitu liczby zdjęć
     val pickFiles = rememberLauncherForActivityResult(
@@ -115,6 +151,15 @@ fun MainScreen(vm: MainViewModel) {
         }
     }
 
+    if (showGallery) {
+        GalleryPicker(
+            firstPage = vm.photos.size + 1,
+            onDone = { uris -> vm.add(uris); showGallery = false },
+            onCancel = { showGallery = false }
+        )
+        return
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -136,12 +181,9 @@ fun MainScreen(vm: MainViewModel) {
                             ) { Icon(Icons.Default.AddPhotoAlternate, null); Spacer(Modifier.width(6.dp)); Text("Dodaj zdjęcia") }
                             DropdownMenu(expanded = addMenu, onDismissRequest = { addMenu = false }) {
                                 DropdownMenuItem(
-                                    text = { Text("Galeria (do 100 naraz)") },
+                                    text = { Text("Galeria (z numerami stron)") },
                                     leadingIcon = { Icon(Icons.Default.PhotoLibrary, null) },
-                                    onClick = {
-                                        addMenu = false
-                                        pickPhotos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                                    })
+                                    onClick = { addMenu = false; openGallery() })
                                 DropdownMenuItem(
                                     text = { Text("Pliki – bez limitu") },
                                     leadingIcon = { Icon(Icons.Default.Folder, null) },
@@ -219,6 +261,16 @@ fun MainScreen(vm: MainViewModel) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun OptionsCard(vm: MainViewModel) {
+    val ctx = LocalContext.current
+    // Android 10 i starsze: zapis w Pobranych i usuwanie wymagają uprawnienia do pamięci
+    val writePermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { granted ->
+        if (granted[Manifest.permission.WRITE_EXTERNAL_STORAGE] != true) {
+            vm.setDeleteAfter(false)
+            Toast.makeText(ctx, "Bez zgody na pamięć nie da się usuwać zdjęć", Toast.LENGTH_LONG).show()
+        }
+    }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedTextField(
@@ -235,6 +287,20 @@ private fun OptionsCard(vm: MainViewModel) {
                 }
                 Switch(checked = vm.options.ocr, enabled = !vm.busy,
                     onCheckedChange = { vm.options = vm.options.copy(ocr = it) })
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Usuń zdjęcia po utworzeniu PDF")
+                    Text("PDF zostanie zapisany w Pobrane/SkanerPDF, a potem zdjęcia zostaną usunięte. " +
+                        "Android zapyta o zgodę na usunięcie zdjęć z galerii.",
+                        style = MaterialTheme.typography.bodySmall)
+                }
+                Switch(checked = vm.options.deleteAfter, enabled = !vm.busy,
+                    onCheckedChange = { on ->
+                        vm.setDeleteAfter(on)
+                        if (on && Build.VERSION.SDK_INT <= 29) writePermission.launch(arrayOf(
+                            Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE))
+                    })
             }
             Text("Rozmiar strony", style = MaterialTheme.typography.labelLarge)
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
@@ -299,6 +365,10 @@ private fun ResultCard(r: PdfResult, vm: MainViewModel, onSave: () -> Unit) {
                 append("${r.pages} str. · $size")
                 if (vm.options.ocr) append(" · rozpoznane słowa: ${r.words}")
             })
+            vm.cleanupInfo?.let { info ->
+                Spacer(Modifier.height(6.dp))
+                Text(info, style = MaterialTheme.typography.bodyMedium)
+            }
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilledTonalButton(onClick = {

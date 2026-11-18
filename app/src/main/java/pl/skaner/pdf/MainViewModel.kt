@@ -2,6 +2,9 @@ package pl.skaner.pdf
 
 import android.app.Application
 import android.content.Intent
+import android.content.IntentSender
+import android.os.Build
+import android.provider.MediaStore
 import android.provider.DocumentsContract
 import android.net.Uri
 import androidx.compose.runtime.getValue
@@ -24,7 +27,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val prefs = app.getSharedPreferences("ustawienia", 0)
 
-    var options by mutableStateOf(PdfOptions())
+    var options by mutableStateOf(PdfOptions(deleteAfter = prefs.getBoolean("deleteAfter", false)))
 
     init {
         // Usuń klucz Google zapisany przez wersję 1.1–1.2
@@ -36,11 +39,25 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var result by mutableStateOf<PdfResult?>(null); private set
     var error by mutableStateOf<String?>(null)
 
+    /** Systemowe okno „Zezwolić na usunięcie N zdjęć?” do pokazania przez ekran. */
+    var pendingDelete by mutableStateOf<IntentSender?>(null); private set
+    /** Podsumowanie: gdzie zapisano PDF i ile zdjęć usunięto. */
+    var cleanupInfo by mutableStateOf<String?>(null); private set
+    private var savedPath: String? = null
+    private var deletedSoFar = 0
+    private var failedSoFar = 0
+    private var mediaCount = 0
+
+    fun setDeleteAfter(on: Boolean) {
+        options = options.copy(deleteAfter = on)
+        prefs.edit().putBoolean("deleteAfter", on).apply()
+    }
+
     private val builder by lazy { PdfBuilder(app) }
 
     fun add(uris: List<Uri>) {
         photos.addAll(uris.map { PhotoItem(it) })
-        result = null
+        result = null; cleanupInfo = null
     }
 
     /** Dodaje wszystkie zdjęcia z folderu (bez podfolderów), w kolejności nazw plików. */
@@ -86,20 +103,58 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun generate() {
         if (photos.isEmpty() || busy) return
-        busy = true; error = null; result = null
+        busy = true; error = null; result = null; cleanupInfo = null
         val name = safeName(fileName)
         val out = File(getApplication<Application>().cacheDir, "pdf/$name.pdf")
         viewModelScope.launch {
             try {
-                result = builder.build(photos.toList(), options.copy(title = name), out) { p, t ->
+                val r = builder.build(photos.toList(), options.copy(title = name), out) { p, t ->
                     progress = p to t
                 }
+                result = r
+                if (options.deleteAfter) cleanup(r)
             } catch (t: Throwable) {
                 error = "Błąd: ${t.message ?: t.javaClass.simpleName}"
             } finally {
                 busy = false
             }
         }
+    }
+
+    /** Najpierw zapis PDF w Pobranych, dopiero potem usuwanie zdjęć. */
+    private suspend fun cleanup(r: PdfResult) {
+        val app = getApplication<Application>()
+        savedPath = try {
+            withContext(Dispatchers.IO) { Cleanup.saveToDownloads(app, r.file) }
+        } catch (t: Throwable) {
+            cleanupInfo = "Nie udało się zapisać PDF w Pobranych (${t.message}). Zdjęcia NIE zostały usunięte."
+            return
+        }
+        val plan = withContext(Dispatchers.IO) { Cleanup.deletePhotos(app, photos.map { it.uri }) }
+        deletedSoFar = plan.deletedDirectly
+        failedSoFar = plan.failed
+        mediaCount = plan.media.size
+        if (plan.media.isNotEmpty() && Build.VERSION.SDK_INT >= 30) {
+            pendingDelete = MediaStore.createDeleteRequest(app.contentResolver, plan.media).intentSender
+        } else finishCleanup()
+    }
+
+    fun deleteDialogShown() { pendingDelete = null }
+
+    /** Wynik systemowego okna usuwania. */
+    fun onDeleteResult(allowed: Boolean) {
+        if (allowed) deletedSoFar += mediaCount else failedSoFar += mediaCount
+        finishCleanup(declined = !allowed)
+    }
+
+    private fun finishCleanup(declined: Boolean = false) {
+        cleanupInfo = buildString {
+            append("PDF zapisany: $savedPath")
+            if (deletedSoFar > 0) append("\nUsunięto zdjęć: $deletedSoFar")
+            if (declined) append("\nUsuwanie zdjęć z galerii anulowane.")
+            else if (failedSoFar > 0) append("\nNie udało się usunąć: $failedSoFar")
+        }
+        if (!declined && failedSoFar == 0) photos.clear()
     }
 
     /** Kopiuje gotowy PDF w miejsce wybrane przez użytkownika (Zapisz jako…). */
